@@ -24,9 +24,7 @@ mod content {
 
     impl Content for PasteContent {
         fn hash(&self) -> String {
-            let content = match self {
-                PasteContent::Text(text) => text,
-            };
+            let PasteContent::Text(content) = &self;
             let md5_value = md5::compute(&content);
             let mut base64_value = base64::encode(&format!("{:x}", md5_value));
             base64_value.truncate(HASHLEN);
@@ -36,68 +34,55 @@ mod content {
 }
 
 mod cache {
-    use content::Content;
+    use content::{Content, PasteContent};
     use std::collections::HashMap;
 
-    pub(crate) trait Cache<T: Content> {
-        fn set(&mut self, value: T);
-        fn get(&self, key: String) -> Option<&T>;
+    pub(crate) trait Cache {
+        fn set(&mut self, value: PasteContent);
+        fn get(&self, key: String) -> Option<&PasteContent>;
     }
 
-    pub(crate) struct MemoryCache<T: Content> {
-        map: HashMap<String, T>,
+    pub(crate) struct MemoryCache {
+        map: HashMap<String, PasteContent>,
     }
 
-    impl<T: Content> MemoryCache<T> {
+    impl MemoryCache {
         pub(crate) fn new() -> Self {
             MemoryCache {
-                map: HashMap::<String, T>::new(),
+                map: HashMap::<String, PasteContent>::new(),
             }
         }
     }
 
-    impl<T: Content> Cache<T> for MemoryCache<T> {
-        fn set(&mut self, value: T) {
+    impl Cache for MemoryCache {
+        fn set(&mut self, value: PasteContent) {
             self.map.insert(value.hash(), value);
         }
 
-        fn get(&self, key: String) -> Option<&T> {
+        fn get(&self, key: String) -> Option<&PasteContent> {
             self.map.get(&key)
         }
     }
 }
 
 mod paste_app {
-    use actix_web::{http, middleware::Logger, pred, App, HttpRequest, HttpResponse, Json, State};
+    use actix_web::{http, middleware::Logger, App, HttpRequest, HttpResponse, Json, State};
     use cache::{Cache, MemoryCache};
     use content::{Content, PasteContent};
-    use std::cell::RefCell;
+    use std::sync::{Arc, Mutex};
 
-    pub(crate) fn app() -> App<AppState> {
-        let state = AppState::new(Box::new(MemoryCache::<PasteContent>::new()));
+    pub(crate) type SharedCache = Arc<Mutex<Box<MemoryCache>>>;
+
+    pub(crate) fn memory_cache() -> SharedCache {
+        Arc::new(Mutex::new(Box::new(MemoryCache::new())))
+    }
+
+    pub(crate) fn paste_app(state: SharedCache) -> App<SharedCache> {
         App::with_state(state)
             .middleware(Logger::default())
-            .middleware(Logger::new("%a %s{User-Agent}i"))
+            .middleware(Logger::new("%a %{User-Agent}i"))
             .resource("/paste", |r| r.method(http::Method::POST).with(paste_post))
             .resource("/paste/{id}", |r| r.method(http::Method::GET).f(paste_get))
-            /*.default_resource(|r| {
-                r.method(http::Method::GET).f(p404);
-                r.route()
-                    .filter(pred::Not(pred::Get()))
-                    .f(|_| HttpResponse::MethodNotAllowed());
-            })*/
-    }
-
-    pub(crate) struct AppState {
-        cache: RefCell<Box<Cache<PasteContent>>>,
-    }
-
-    impl AppState {
-        fn new(cache: Box<Cache<PasteContent>>) -> Self {
-            AppState {
-                cache: RefCell::new(cache),
-            }
-        }
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -105,39 +90,36 @@ mod paste_app {
         hash: String,
     }
 
-    fn paste_post((content, state): (Json<PasteContent>, State<AppState>)) -> HttpResponse {
+    fn paste_post((content, state): (Json<PasteContent>, State<SharedCache>)) -> HttpResponse {
         let content = content.into_inner();
         let hash = content.hash();
-        let mut memcache = state.cache.borrow_mut();
+        let mut memcache = state.lock().unwrap();
         memcache.set(content);
-        println!("hash: {}", hash);
         HttpResponse::Ok()
-            .content_type("text/plain")
-            .body(hash)
+            .content_type("application/json")
+            .json(PasteResponse { hash })
     }
 
-    fn paste_get(req: &HttpRequest<AppState>) -> HttpResponse {
+    fn paste_get(req: &HttpRequest<SharedCache>) -> HttpResponse {
         let hash_id = req.match_info().get("id").unwrap();
-        let state = req.state();
-        let res = match state.cache.borrow().get(hash_id.to_string()) {
+        let cache = req.state().lock().unwrap();
+        let res = match cache.get(hash_id.to_string()) {
             Some(ref paste) => format!("{:?}", paste),
             None => "Not found!".to_string(),
         };
         HttpResponse::Ok().content_type("text/plain").body(res)
     }
-
-    fn p404(_: &HttpRequest<AppState>) -> HttpResponse {
-        HttpResponse::NotFound()
-            .content_type("text/plain")
-            .body("Custom not found 404!")
-    }
 }
 
 fn main() {
-    std::env::set_var("RUST_LOG", "actix_web=debug");
+    use paste_app;
+    use std::env;
+
+    env::set_var("RUST_LOG", "actix_web=debug");
     env_logger::init();
 
-    actix_web::server::new(move || paste_app::app())
+    let cache = paste_app::memory_cache();
+    actix_web::server::new(move || paste_app::paste_app(cache.clone()))
         .bind("127.0.0.1:8088")
         .unwrap()
         .run();
