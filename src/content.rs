@@ -1,13 +1,17 @@
 use base64;
 use md5;
 
+/// The Content trait specify a hash function in order to uniquely represent
+/// some Content.
 pub(crate) trait Content {
     fn hash(&self) -> String;
 }
 
+/// Numbers of digits to be used as unique identifier for paste contents.
 const HASHLEN: usize = 7usize;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/// PasteContent represent the possible contents in some paste.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) enum PasteContent {
     PlainText(String),
 }
