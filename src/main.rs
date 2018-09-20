@@ -1,5 +1,3 @@
-#![feature(rust_2018_preview)]
-
 extern crate actix_web;
 extern crate env_logger;
 extern crate futures;
