@@ -26,3 +26,37 @@ impl Content for PasteContent {
         base64_value
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn paste_content_hash_has_size_hashlen() {
+        assert_eq!(
+            HASHLEN,
+            PasteContent::PlainText("ABCDEFGHIKLMNOP".to_string())
+                .hash()
+                .len()
+        );
+        assert_eq!(
+            HASHLEN,
+            PasteContent::PlainText("A".to_string()).hash().len()
+        );
+        assert_eq!(
+            HASHLEN,
+            PasteContent::PlainText("123456".to_string()).hash().len()
+        );
+        assert_eq!(
+            HASHLEN,
+            PasteContent::PlainText("1234567".to_string()).hash().len()
+        );
+        assert_eq!(
+            HASHLEN,
+            PasteContent::PlainText("12345678".to_string()).hash().len()
+        );
+        assert_eq!(
+            HASHLEN,
+            PasteContent::PlainText("".to_string()).hash().len()
+        );
+    }
+}
