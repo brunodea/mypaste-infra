@@ -1,6 +1,6 @@
 use actix_web::{http, middleware::Logger, App, HttpRequest, HttpResponse, Json, State};
-use cache::{Cache, MemoryCache};
-use content::{Content, PasteContent};
+use crate::cache::{Cache, MemoryCache};
+use crate::content::{Content, PasteContent};
 use std::sync::{Arc, Mutex};
 
 pub(crate) type SharedCache = Arc<Mutex<Box<MemoryCache>>>;

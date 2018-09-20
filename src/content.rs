@@ -31,6 +31,7 @@ impl Content for PasteContent {
 mod tests {
     use super::*;
 
+    #[test]
     fn paste_content_hash_has_size_hashlen() {
         assert_eq!(
             HASHLEN,

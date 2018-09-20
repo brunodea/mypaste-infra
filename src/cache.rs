@@ -1,4 +1,4 @@
-use content::{Content, PasteContent};
+use crate::content::{Content, PasteContent};
 use std::collections::HashMap;
 
 /// Cache represents a simple set/get cache system.
