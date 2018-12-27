@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::sync::{Arc, Mutex};
 
 use rocket::{
@@ -6,7 +6,9 @@ use rocket::{
     data::{self, FromDataSimple},
     get,
     http::{ContentType, Status},
-    post, response, routes, Data, Outcome, Request, State,
+    post,
+    response::Response,
+    routes, Data, Outcome, Request, State,
 };
 
 use serde_json;
@@ -51,27 +53,33 @@ impl FromDataSimple for PasteContent {
 }
 
 #[get("/<hash_id>")]
-fn paste_get(hash_id: String, cache: State<SharedCache>) -> response::status::Accepted<String> {
+fn paste_get(hash_id: String, cache: State<SharedCache>) -> Response {
     let cache = cache.inner().lock().unwrap();
-    let value = match cache.get(hash_id.to_string()) {
-        Some(paste) => serde_json::to_string(paste).unwrap(),
-        None => "Not found!".to_string(),
+    let (body, status) = if let Some(paste) = cache.get(hash_id.to_string()) {
+        (serde_json::to_string(paste).unwrap(), Status::Accepted)
+    } else {
+        (
+            format!("Unable to find data for {}.", hash_id),
+            Status::NotFound,
+        )
     };
-
-    response::status::Accepted(Some(value))
+    Response::build()
+        .sized_body(Cursor::new(body))
+        .status(status)
+        .finalize()
 }
 
 #[post("/", format = "application/json", data = "<content>")]
-fn paste_post(
-    content: PasteContent,
-    cache: State<SharedCache>,
-) -> response::status::Accepted<String> {
+fn paste_post(content: PasteContent, cache: State<SharedCache>) -> Response {
     let hash = content.hash();
 
     let mut cache = cache.inner().lock().unwrap();
     cache.set(content);
 
-    response::status::Accepted(Some(format!("{:?}", hash)))
+    Response::build()
+        .sized_body(Cursor::new(format!("{:?}", hash)))
+        .status(Status::Ok)
+        .finalize()
 }
 
 pub(crate) fn start() {
