@@ -12,7 +12,7 @@ pub(crate) trait Content {
 /// Numbers of digits to be used as unique identifier for paste contents.
 const HASHLEN: usize = 7usize;
 
-/// PasteContent represent the possible contents in some paste.
+/// PasteContent represents the possible contents in some paste.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) enum PasteContent {
     PlainText(String),
