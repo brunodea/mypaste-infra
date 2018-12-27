@@ -1,6 +1,8 @@
 use base64;
 use md5;
 
+use serde::{Deserialize, Serialize};
+
 /// The Content trait specify a hash function in order to uniquely represent
 /// some Content.
 pub(crate) trait Content {

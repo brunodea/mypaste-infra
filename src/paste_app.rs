@@ -1,16 +1,18 @@
 use std::io::Read;
-
-use crate::cache::{Cache, MemoryCache};
-use crate::content::{Content, PasteContent};
+use std::sync::{Arc, Mutex};
 
 use rocket::{
     self,
     data::{self, FromDataSimple},
+    get,
     http::{ContentType, Status},
-    response, Data, Outcome, Request, State,
+    post, response, routes, Data, Outcome, Request, State,
 };
+
 use serde_json;
-use std::sync::{Arc, Mutex};
+
+use crate::cache::{Cache, MemoryCache};
+use crate::content::{Content, PasteContent};
 
 type SharedCache = Arc<Mutex<Box<MemoryCache>>>;
 
